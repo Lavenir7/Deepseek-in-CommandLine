@@ -1,0 +1,54 @@
+#!/usr/bin/python
+import requests
+import yaml
+import json
+import argparse
+import os
+
+# CONSTANTS
+APIKEY_PATH = "assets/keys/"
+
+def myWarning(info: str):
+    print(f"\033[93mWarning: {info}\033[0m")
+
+parser = argparse.ArgumentParser(description="Check DeepSeek Account")
+
+parser.add_argument("-k", "--apikey", type = str, default = "apikey", help = "apikey 文件路径")
+
+args = parser.parse_args()
+
+for apikey_path_i in (args.apikey, APIKEY_PATH+args.apikey):
+    if os.path.exists(apikey_path_i) and os.path.isfile(apikey_path_i):
+        with open(apikey_path_i, 'r') as rf:
+            apiKey = rf.read().strip()
+        break
+else:
+    myWarning(f"api key不存在 : {args.apikey}")
+    raise SystemExit
+
+url = "https://api.deepseek.com/user/balance"
+
+payload={}
+headers = {
+    'Accept': 'application/json',
+    'Authorization': f'Bearer {apiKey}'
+}
+
+response = requests.request("GET", url, headers=headers, data=payload)
+
+def Chineseization(sss):
+    e2c = {
+        "is_available" : "账户可用",
+        "balance_infos" : "余额信息",
+        "currency" : "货币",
+        "total_balance" : "总余额",
+        "granted_balance" : "赠送余额",
+        "topped_up_balance" : "充值余额",
+    }
+    for ei in e2c.keys():
+        if ei in sss:
+            sss = sss.replace(ei, e2c[ei])
+    return sss
+
+res = json.loads(Chineseization(response.text))
+print(yaml.dump(res, sort_keys=False, default_flow_style=False, allow_unicode = True))

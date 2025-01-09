@@ -1,0 +1,196 @@
+#!/usr/bin/python
+from openai import OpenAI
+from argparse import ArgumentParser
+from yaml import dump, safe_load
+from datetime import datetime
+import os
+
+# CONSTANTS
+CHATS_PATH = "assets/chats/"
+CHAT_LIST_PATH = CHATS_PATH+".list.yml"
+PROMPT_PATH = "assets/prompts/"
+APIKEY_PATH = "assets/keys/"
+
+def myWarning(info: str):
+    print(f"\033[93mWarning: {info}\033[0m")
+
+# params
+parser = ArgumentParser(description = "DeepSeek-V3 chat")
+
+parser.add_argument("-k", "--apikey", type = str, default = "apikey", help = "apikey 文件路径")
+parser.add_argument("-p", "--prompt", type = str, default = "assistant", help = "系统提示内容文件名")
+
+args = parser.parse_args()
+
+for apikey_path_i in (args.apikey, APIKEY_PATH+args.apikey):
+    if os.path.exists(apikey_path_i) and os.path.isfile(apikey_path_i):
+        with open(apikey_path_i, 'r') as rf:
+            apiKey = rf.read().strip()
+        break
+else:
+    myWarning(f"api key 不存在 : {args.apikey}")
+    raise SystemExit
+for prompt_path_i in (args.prompt, PROMPT_PATH+args.prompt):
+    if os.path.exists(prompt_path_i) and os.path.isfile(prompt_path_i):
+        with open(prompt_path_i, 'r', encoding = "utf-8") as rf:
+            system_prompt = rf.read()
+        break
+else:
+    myWarning(f"系统提示内容不存在 : {args.prompt}")
+    system_prompt = ""
+
+help_document = '''
+### Available Commands:
+    - /ls               List all saved sessions
+    - /clear            Clear session context
+    - /load <session>   Load a session
+    - /save <session>   Save your current session
+    - /del <session>    Delete a session
+    - /bye              Exit
+    - /?, /h, /help     Help for a command
+
+### Use """ to begin a multi-line message.'''
+
+def handle(msg: str) -> int:
+    if msg in ("/?", "/h", "/help"):
+        msg_id = 1
+        print(help_document)
+    elif msg == "/bye":
+        msg_id = 0
+    elif msg == "/ls":
+        msg_id = 1
+        listChats()
+    elif msg == "/clear":
+        msg_id = 1
+        messages = [fmt("system", system_prompt)]
+        print("已清除当前上下文")
+    elif msg.startswith("/load "):
+        msg_id = 1
+        chat_name = msg.split(' ', 1)[1].strip()
+        loaded = loadChat(chat_name)
+    elif msg.startswith("/save "):
+        msg_id = 1
+        chat_info = msg.split(' ', 1)[1].strip()
+        if ' ' in chat_info:
+            chat_name, chat_mark = chat_info.split(' ', 1)
+        else:
+            chat_name = chat_info
+            chat_mark = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        saved = saveChat(chat_name, chat_mark)
+    elif msg.startswith("/del "):
+        msg_id = 1
+        chat_name = msg.split(' ', 1)[1].strip()
+        loaded = delChat(chat_name)
+    else:
+        msg_id = -1
+        myWarning(f"没有该命令: {msg}")
+    return msg_id
+
+def listChats():
+    print("可用会话:")
+    with open(CHAT_LIST_PATH, 'r', encoding = "utf-8") as rf:
+        for chati in rf:
+            print("  -", chati, end = '')
+
+def loadChat(chat_name: str):
+    global messages
+    with open(CHAT_LIST_PATH, 'r', encoding = "utf-8") as rf:
+        chat_list = safe_load(rf.read())
+        if not chat_list:
+            chat_list = dict()
+    if chat_name not in chat_list.keys():
+        myWarning(f"会话 {chat_name} 不存在")
+        return 0
+    with open(CHATS_PATH+chat_name+".yaml", 'r', encoding = "utf-8") as rf:
+        messages = safe_load(rf.read())
+    print(f"已加载会话: {chat_name}")
+    return 1
+
+def saveChat(chat_name: str, chat_mark: str):
+    with open(CHAT_LIST_PATH, 'r', encoding = "utf-8") as rf:
+        chat_list = safe_load(rf.read())
+    if not chat_list:
+        chat_list = dict()
+    if chat_name in chat_list.keys():
+        myWarning(f"会话 {chat_name} 已存在, 是否覆盖？ (yes/no) ")
+        confirm = input()
+        if confirm.lower() not in ('y', "yes"):
+            return 0
+    chat_list[chat_name] = chat_mark
+    with open(CHAT_LIST_PATH, 'w', encoding = "utf-8") as wf:
+        wf.write(dump(chat_list))
+    with open(CHATS_PATH+chat_name+".yaml", 'w', encoding = "utf-8") as wf:
+        wf.write(dump(messages, sort_keys = False))
+    print(f"已保存会话: {chat_name}")
+    return 1
+
+def delChat(chat_name: str):
+    with open(CHAT_LIST_PATH, 'r', encoding = "utf-8") as rf:
+        chat_list = safe_load(rf.read())
+        if not chat_list:
+            chat_list = dict()
+    if chat_name not in chat_list.keys():
+        myWarning(f"会话 {chat_name} 不存在")
+        return -1
+    del chat_list[chat_name]
+    with open(CHAT_LIST_PATH, 'w', encoding = "utf-8") as wf:
+        wf.write(dump(chat_list))
+    chat_file_path = CHATS_PATH+chat_name+".yaml"
+    try:
+        os.remove(chat_file_path)
+        print(f"已删除会话: {chat_name}")
+        return 1
+    except FileNotFoundError:
+        myWarning(f"会话文件 {chat_file_path} 不存在 ({chat_name}已从会话列表中移除)")
+        return 0
+    except PermissionError:
+        myWarning(f"无权限删除会话文件 {chat_file_path}, 请尝试手动删除 ({chat_name}已从会话列表中移除)")
+        return 0
+    except Exception as e:
+        myWarning(f"删除会话文件 {chat_file_path} 时发生错误 ({chat_name}已从会话列表中移除) : {e}")
+        return 0
+
+def showTokens(usage):
+    print("\n\n"+"="*10)
+    print(f"- total tokens : {usage.total_tokens} ({usage.completion_tokens} + {usage.prompt_tokens})")
+    print(f"- prompt tokens (hit+miss) : {usage.prompt_tokens} ({usage.prompt_cache_hit_tokens} + {usage.prompt_cache_miss_tokens})")
+    if usage.completion_tokens_details:
+        print(f"completion tokens details: {usage.completion_tokens_details}")
+    if usage.prompt_tokens_details:
+        print(f"prompt tokens details: {usage.prompt_tokens_details}")
+    print("="*10+"\n")
+
+
+fmt = lambda role, content: {"role": role, "content": content}
+
+deepseek_api_url = "https://api.deepseek.com"
+client = OpenAI(api_key = apiKey, base_url = deepseek_api_url)
+messages = [fmt("system", system_prompt)]
+
+i = 0
+while True:
+    i += 1
+    msg = input("\n\033[92m❯❯❯ \033[0m")
+    if msg.startswith('/'):
+        msg_id = handle(msg)
+        if msg_id == 0:
+            break
+        continue
+
+    messages.append(fmt("user", msg)) # 添加上下文
+    # 发送并接收
+    response = client.chat.completions.create(
+        model = "deepseek-chat",
+        messages = messages,
+        stream = True
+    )
+    response_contents = ""
+    print("\n\033[94mDeepSeek-V3:\033[0m\n")
+    for res in response:
+        res_content = res.choices[0].delta.content
+        response_contents += res_content
+        print(res_content, end = '', flush = True)
+    messages.append(fmt("assistant", response_contents))
+    # 输出本次消耗的tokens
+    showTokens(res.usage)
+
