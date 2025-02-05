@@ -75,7 +75,7 @@ def handle(msg: str) -> int:
             chat_name, chat_mark = chat_info.split(' ', 1)
         else:
             chat_name = chat_info
-            chat_mark = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            chat_mark = ''
         saved = saveChat(chat_name, chat_mark)
     elif msg.startswith("/del "):
         msg_id = 1
@@ -106,7 +106,9 @@ def loadChat(chat_name: str):
     print(f"已加载会话: {chat_name}")
     return 1
 
-def saveChat(chat_name: str, chat_mark: str):
+def saveChat(chat_name: str, chat_mark: str = ''):
+    if chat_mark == '':
+        chat_mark = "Created time: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with open(CHAT_LIST_PATH, 'r', encoding = "utf-8") as rf:
         chat_list = safe_load(rf.read())
     if not chat_list:
