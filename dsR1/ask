@@ -4,13 +4,13 @@ from argparse import ArgumentParser
 import os
 
 # CONSTANTS
-PROMPT_PATH = "assets/prompts/"
-APIKEY_PATH = "assets/keys/"
+PROMPT_PATH = "../assets/prompts/"
+APIKEY_PATH = "../assets/keys/"
 
 def myWarning(info: str):
     print(f"\033[93mWarning: {info}\033[0m")
 
-parser = ArgumentParser(description="DeepSeekV3")
+parser = ArgumentParser(description="DeepSeek-R1")
 
 parser.add_argument("inputs", type=str, default="", help="输入")
 parser.add_argument("-k", "--apikey", type = str, default = "apikey", help = "apikey 文件路径")
@@ -20,7 +20,7 @@ args = parser.parse_args()
 inputs = args.inputs
 if not inputs:
     raise SystemExit
-print("DeepSeek-V3: ")
+print("DeepSeek-R1: ")
 
 for apikey_path_i in (args.apikey, APIKEY_PATH+args.apikey):
     if os.path.exists(apikey_path_i) and os.path.isfile(apikey_path_i):
@@ -52,7 +52,7 @@ def showTokens(usage):
     print("="*10+"\n")
 
 response = client.chat.completions.create(
-    model="deepseek-chat",
+    model="deepseek-reasoner",
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": inputs},

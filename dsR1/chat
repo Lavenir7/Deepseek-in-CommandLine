@@ -6,16 +6,16 @@ from datetime import datetime
 import os
 
 # CONSTANTS
-CHATS_PATH = "assets/chats/"
+CHATS_PATH = "../assets/chats/"
 CHAT_LIST_PATH = CHATS_PATH+".list.yml"
-PROMPT_PATH = "assets/prompts/"
-APIKEY_PATH = "assets/keys/"
+PROMPT_PATH = "../assets/prompts/"
+APIKEY_PATH = "../assets/keys/"
 
 def myWarning(info: str):
     print(f"\033[93mWarning: {info}\033[0m")
 
 # params
-parser = ArgumentParser(description = "DeepSeek-V3 chat")
+parser = ArgumentParser(description = "DeepSeek-R1")
 
 parser.add_argument("-k", "--apikey", type = str, default = "apikey", help = "apikey 文件路径")
 parser.add_argument("-p", "--prompt", type = str, default = "assistant", help = "系统提示内容文件名")
@@ -180,12 +180,12 @@ while True:
     messages.append(fmt("user", msg)) # 添加上下文
     # 发送并接收
     response = client.chat.completions.create(
-        model = "deepseek-chat",
+        model = "deepseek-reasoner",
         messages = messages,
         stream = True
     )
     response_contents = ""
-    print("\n\033[94mDeepSeek-V3:\033[0m\n")
+    print("\n\033[94mDeepSeek-R1:\033[0m\n")
     for res in response:
         res_content = res.choices[0].delta.content
         response_contents += res_content
